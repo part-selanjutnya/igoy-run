@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Platformer Bapak Mario</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            background-color: #5c94fc; /* Warna langit ala Mario */
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+            border-radius: 8px;
+        }
+        #instructions {
+            position: absolute;
+            top: 20px;
+            color: white;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="instructions">
+        <h2>Gunakan Panah Kiri/Kanan untuk Bergerak, dan Panah Atas/Spasi untuk Melompat</h2>
+    </div>
+
+    <canvas id="gameCanvas" width="800" height="500"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Memuat gambar karakter
+        const playerImg = new Image();
+        playerImg.src = 'igoy.png'; // Pastikan nama file ini persis dan berada di folder yang sama
+
+        // Status karakter
+        const player = {
+            x: 50, 
+            y: 350, 
+            width: 50, 
+            height: 70, // Disesuaikan agar proporsi foto agak memanjang seperti manusia
+            dx: 0, 
+            dy: 0, 
+            speed: 5, 
+            jumpPower: -12,
+            grounded: false
+        };
+
+        const gravity = 0.6;
+        const keys = { right: false, left: false, up: false };
+
+        // Pijakan (Platforms)
+        const platforms = [
+            { x: 0, y: 450, w: 800, h: 50, color: '#8B4513' }, // Tanah dasar
+            { x: 250, y: 350, w: 150, h: 20, color: '#CD853F' }, // Pijakan 1
+            { x: 500, y: 250, w: 150, h: 20, color: '#CD853F' }, // Pijakan 2
+            { x: 150, y: 150, w: 100, h: 20, color: '#CD853F' }  // Pijakan 3
+        ];
+
+        // Event Listener Keyboard
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = true;
+            if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = true;
+            if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
+                if (player.grounded) {
+                    player.dy = player.jumpPower;
+                    player.grounded = false;
+                }
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
+            if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = false;
+        });
+
+        // Fisika dan Logika Game
+        function update() {
+            // Gerakan Horizontal
+            if (keys.right) player.dx = player.speed;
+            else if (keys.left) player.dx = -player.speed;
+            else player.dx = 0;
+
+            player.x += player.dx;
+            player.y += player.dy;
+            player.dy += gravity; // Gravitasi menarik ke bawah
+
+            player.grounded = false;
+
+            // Deteksi Tabrakan dengan Pijakan
+            platforms.forEach(p => {
+                // Mengecek batas kotak karakter dan pijakan
+                if (player.x < p.x + p.w && 
+                    player.x + player.width > p.x &&
+                    player.y < p.y + p.h && 
+                    player.y + player.height > p.y) {
+                    
+                    // Tabrakan dari atas (mendarat di pijakan)
+                    if (player.dy > 0 && player.y + player.height - player.dy <= p.y) {
+                        player.grounded = true;
+                        player.dy = 0;
+                        player.y = p.y - player.height;
+                    }
+                }
+            });
+
+            // Batas layar (Tembok)
+            if (player.x < 0) player.x = 0;
+            if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+            
+            // Jika jatuh ke jurang (melewati batas bawah)
+            if (player.y > canvas.height) {
+                player.x = 50; 
+                player.y = 100; // Reset ke posisi awal
+                player.dy = 0;
+            }
+        }
+
+        // Render visual
+        function draw() {
+            // Bersihkan kanvas di setiap frame
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Gambar platform
+            platforms.forEach(p => {
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x, p.y, p.w, p.h);
+                
+                // Tambahkan sedikit gaya rumput di atas tanah
+                ctx.fillStyle = '#228B22';
+                ctx.fillRect(p.x, p.y, p.w, 5);
+            });
+
+            // Gambar Karakter
+            if (playerImg.complete && playerImg.naturalWidth !== 0) {
+                // Menggambar foto sebagai karakter
+                ctx.drawImage(playerImg, player.x, player.y, player.width, player.height);
+            } else {
+                // Fallback merah jika gambar lambat dimuat
+                ctx.fillStyle = 'red';
+                ctx.fillRect(player.x, player.y, player.width, player.height);
+            }
+        }
+
+        // Game Loop
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        // Mulai loop saat gambar selesai dimuat (atau mulai langsung)
+        loop();
+    </script>
+</body>
+</html>
