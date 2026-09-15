@@ -2,55 +2,138 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Game Platformer Bapak Mario</title>
     <style>
         body {
             margin: 0;
             padding: 0;
-            background-color: #333;
+            background-color: #222;
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             height: 100vh;
             overflow: hidden;
             font-family: Arial, sans-serif;
+            touch-action: none; /* Mencegah layar ter-scroll saat main di HP */
         }
+        
+        #game-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Canvas dibuat responsif */
         canvas {
-            background-color: #5c94fc; /* Warna langit ala Mario */
-            box-shadow: 0 0 20px rgba(0,0,0,0.8);
-            border-radius: 8px;
+            background-color: #5c94fc;
+            box-shadow: 0 0 10px rgba(0,0,0,0.8);
+            width: 100%; /* Lebar mengikuti layar */
+            max-width: 800px;
+            aspect-ratio: 8 / 5; /* Mempertahankan rasio 800x500 */
+            border-bottom: 2px solid #000;
         }
-        #instructions {
-            position: absolute;
-            top: 20px;
+
+        /* Kontrol Virtual untuk HP */
+        #mobile-controls {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            max-width: 800px;
+            padding: 20px;
+            box-sizing: border-box;
+            background-color: #333;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .d-pad-vertical {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .btn {
+            background-color: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.5);
             color: white;
-            text-align: center;
+            font-size: 24px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .btn:active {
+            background-color: rgba(255, 255, 255, 0.5);
+        }
+
+        /* Sembunyikan tombol di layar PC (layar besar) */
+        @media (min-width: 801px) {
+            #mobile-controls {
+                display: none;
+            }
+            #instructions {
+                display: block;
+                color: white;
+                margin-bottom: 10px;
+            }
+        }
+        @media (max-width: 800px) {
+            #instructions {
+                display: none; /* Sembunyikan teks instruksi keyboard di HP */
+            }
         }
     </style>
 </head>
 <body>
 
     <div id="instructions">
-        <h2>Gunakan Panah Kiri/Kanan untuk Bergerak, dan Panah Atas/Spasi untuk Melompat</h2>
+        <h3>Gunakan Panah Kiri/Kanan/Bawah untuk Bergerak, dan Atas/Spasi untuk Melompat</h3>
     </div>
 
-    <canvas id="gameCanvas" width="800" height="500"></canvas>
+    <div id="game-container">
+        <!-- Resolusi asli tetap 800x500, CSS yang mengaturnya agar pas di layar -->
+        <canvas id="gameCanvas" width="800" height="500"></canvas>
+        
+        <!-- Tombol Virtual -->
+        <div id="mobile-controls">
+            <!-- Kiri Kanan -->
+            <div class="control-group">
+                <div class="btn" id="btnLeft">⬅️</div>
+                <div class="btn" id="btnRight">➡️</div>
+            </div>
+            <!-- Atas Bawah -->
+            <div class="control-group d-pad-vertical">
+                <div class="btn" id="btnUp" style="margin-bottom: -20px; z-index: 10;">⬆️</div>
+                <div class="btn" id="btnDown">⬇️</div>
+            </div>
+        </div>
+    </div>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
-        // Memuat gambar karakter
         const playerImg = new Image();
-        playerImg.src = 'igoy.png'; // Pastikan nama file ini persis dan berada di folder yang sama
+        playerImg.src = 'igoy.png'; // File foto Anda
 
-        // Status karakter
         const player = {
             x: 50, 
             y: 350, 
             width: 50, 
-            height: 70, // Disesuaikan agar proporsi foto agak memanjang seperti manusia
+            height: 70, 
             dx: 0, 
             dy: 0, 
             speed: 5, 
@@ -59,20 +142,20 @@
         };
 
         const gravity = 0.6;
-        const keys = { right: false, left: false, up: false };
+        const keys = { right: false, left: false, up: false, down: false };
 
-        // Pijakan (Platforms)
         const platforms = [
-            { x: 0, y: 450, w: 800, h: 50, color: '#8B4513' }, // Tanah dasar
-            { x: 250, y: 350, w: 150, h: 20, color: '#CD853F' }, // Pijakan 1
-            { x: 500, y: 250, w: 150, h: 20, color: '#CD853F' }, // Pijakan 2
-            { x: 150, y: 150, w: 100, h: 20, color: '#CD853F' }  // Pijakan 3
+            { x: 0, y: 450, w: 800, h: 50, color: '#8B4513' },
+            { x: 250, y: 350, w: 150, h: 20, color: '#CD853F' },
+            { x: 500, y: 250, w: 150, h: 20, color: '#CD853F' },
+            { x: 150, y: 150, w: 100, h: 20, color: '#CD853F' }
         ];
 
-        // Event Listener Keyboard
+        // === KONTROL KEYBOARD (Untuk PC) ===
         window.addEventListener('keydown', (e) => {
             if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = true;
             if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = true;
+            if (e.code === 'ArrowDown' || e.code === 'KeyS') keys.down = true;
             if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
                 if (player.grounded) {
                     player.dy = player.jumpPower;
@@ -84,30 +167,77 @@
         window.addEventListener('keyup', (e) => {
             if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
             if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = false;
+            if (e.code === 'ArrowDown' || e.code === 'KeyS') keys.down = false;
         });
 
-        // Fisika dan Logika Game
+        // === KONTROL LAYAR SENTUH (Untuk Android/HP) ===
+        function setupTouchControl(btnId, key) {
+            const btn = document.getElementById(btnId);
+            
+            // Saat tombol ditekan
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault(); // Mencegah zoom/scroll
+                keys[key] = true;
+                
+                // Logika khusus untuk lompat agar langsung merespon sentuhan
+                if (key === 'up' && player.grounded) {
+                    player.dy = player.jumpPower;
+                    player.grounded = false;
+                }
+            });
+            btn.addEventListener('mousedown', (e) => { // Support klik mouse juga
+                e.preventDefault();
+                keys[key] = true;
+                if (key === 'up' && player.grounded) {
+                    player.dy = player.jumpPower;
+                    player.grounded = false;
+                }
+            });
+
+            // Saat tombol dilepas
+            btn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                keys[key] = false;
+            });
+            btn.addEventListener('mouseup', (e) => {
+                e.preventDefault();
+                keys[key] = false;
+            });
+            // Jika jari/mouse bergeser keluar dari tombol
+            btn.addEventListener('mouseleave', () => keys[key] = false);
+            btn.addEventListener('touchcancel', () => keys[key] = false);
+        }
+
+        setupTouchControl('btnLeft', 'left');
+        setupTouchControl('btnRight', 'right');
+        setupTouchControl('btnUp', 'up');
+        setupTouchControl('btnDown', 'down');
+
+        // === LOGIKA GAME ===
         function update() {
-            // Gerakan Horizontal
+            // Gerakan Kanan/Kiri
             if (keys.right) player.dx = player.speed;
             else if (keys.left) player.dx = -player.speed;
             else player.dx = 0;
 
+            // Tombol Bawah (Mendarat cepat jika di udara)
+            if (keys.down && !player.grounded) {
+                player.dy += 1.5; // Menambah beban gravitasi
+            }
+
             player.x += player.dx;
             player.y += player.dy;
-            player.dy += gravity; // Gravitasi menarik ke bawah
+            player.dy += gravity;
 
             player.grounded = false;
 
-            // Deteksi Tabrakan dengan Pijakan
+            // Deteksi Tabrakan
             platforms.forEach(p => {
-                // Mengecek batas kotak karakter dan pijakan
                 if (player.x < p.x + p.w && 
                     player.x + player.width > p.x &&
                     player.y < p.y + p.h && 
                     player.y + player.height > p.y) {
                     
-                    // Tabrakan dari atas (mendarat di pijakan)
                     if (player.dy > 0 && player.y + player.height - player.dy <= p.y) {
                         player.grounded = true;
                         player.dy = 0;
@@ -116,52 +246,45 @@
                 }
             });
 
-            // Batas layar (Tembok)
+            // Batas layar (kiri & kanan)
             if (player.x < 0) player.x = 0;
             if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
             
-            // Jika jatuh ke jurang (melewati batas bawah)
+            // Reset jika jatuh
             if (player.y > canvas.height) {
                 player.x = 50; 
-                player.y = 100; // Reset ke posisi awal
+                player.y = 100;
                 player.dy = 0;
             }
         }
 
-        // Render visual
+        // === VISUAL ===
         function draw() {
-            // Bersihkan kanvas di setiap frame
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Gambar platform
+            // Pijakan
             platforms.forEach(p => {
                 ctx.fillStyle = p.color;
                 ctx.fillRect(p.x, p.y, p.w, p.h);
-                
-                // Tambahkan sedikit gaya rumput di atas tanah
                 ctx.fillStyle = '#228B22';
                 ctx.fillRect(p.x, p.y, p.w, 5);
             });
 
-            // Gambar Karakter
+            // Karakter
             if (playerImg.complete && playerImg.naturalWidth !== 0) {
-                // Menggambar foto sebagai karakter
                 ctx.drawImage(playerImg, player.x, player.y, player.width, player.height);
             } else {
-                // Fallback merah jika gambar lambat dimuat
                 ctx.fillStyle = 'red';
                 ctx.fillRect(player.x, player.y, player.width, player.height);
             }
         }
 
-        // Game Loop
         function loop() {
             update();
             draw();
             requestAnimationFrame(loop);
         }
 
-        // Mulai loop saat gambar selesai dimuat (atau mulai langsung)
         loop();
     </script>
 </body>
